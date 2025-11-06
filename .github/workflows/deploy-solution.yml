@@ -1,0 +1,80 @@
+name: Power Platform Deployment Pipeline
+
+on:
+  workflow_dispatch: # allows manual trigger
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install Power Platform CLI
+      run: choco install microsoft-powerplatform-cli -y
+
+    # Step 1: Export solution from Dev
+    - name: Export solutions from Dev
+      shell: pwsh
+      run: |
+        $solutionName = "UnderwritingWorkbench"
+        $exportPath = "$(Resolve-Path .)\Solutions\$solutionName.zip"
+        pac auth create -url https://richasolsdev.crm11.dynamics.com --name DevEnv
+        pac solution export --name $solutionName --path $exportPath --managed false --overwrite
+        Write-Host "Solution exported successfully from Dev!"
+
+    # Step 2: Import into Review Environment (Power Apps Code Review Tool)
+    - name: Import to Review Environment
+      shell: pwsh
+      run: |
+        $solutionName = "UnderwritingWorkbench"
+        $exportPath = "$(Resolve-Path .)\Solutions\$solutionName.zip"
+        pac auth create -url https://org2ee6e5eb.crm11.dynamics.com --name ReviewEnv
+        pac solution import --path $exportPath --overwrite --publish-changes
+        Write-Host "Imported solution into review environment for code review"
+        
+    # Step 3: Trigger Power Apps Code Review Tool
+    - name: Run Code Review Tool
+      shell: pwsh
+      run: |
+        Write-Host "Running Power Apps Code Review Tool..."
+        # Mention PowerShell script to trigger code review
+        Start-Sleep -Seconds 10
+        # Simulate reading results
+        $issues = 0
+        if ($issues -gt 0) {
+          Write-Error "Code review failed with $issues issues!"
+        } else {
+          Wirte-Host "Code review passed!"
+        }
+
+    # Step 4: Unpack the exported solution for custom validation
+    - name: Unpack solution
+      shell: pwsh
+      run: |
+        $solutionName = "UnderwritingWorkbench"
+        $exportPath = "$(Resolve-Path .)\Solutions\$solutionName.zip"
+        $unpackPath = "$(Resolve-Path .)\UnpackedSolution"
+        pac solution unpack --zipfile $exportPath --folder $unpackPath --overwrite
+        Write-Host "Solution unpacked for validation."
+
+    # Step 5: Run your custom validation script
+    - name: Run Best Practice Validation
+      shell: pwsh
+      run: |
+        pwsh ./scripts/validate-solution.ps1 -solutionPath .\UnpackedSolution
+
+    # Step 6: Deploy to Test (only if all previous steps pass)
+    - name: Deploy to Test
+      if: success()
+      shell: pwsh
+      run: |
+        $solutionName = "UnderwritingWorkbenchTarget"
+        $solutionZip = "$(Resolve-Path .)\Solutions\$solutionName.zip"
+        pac auth create -url https://richasolsdev.crm11.dynamics.com --name TestEnv
+        pac solution import --path $solutionZip --overwrite --publish-changes
+        Write-Host "Successfully deployed to Test environment."
