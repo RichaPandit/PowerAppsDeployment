@@ -14,30 +14,19 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Install Power Platform CLI
+    - name: Install Power Platform CLI via Chocolatey
       shell: pwsh
       run: |
-        Write-Host "Downloading PAC CLI..."
-        Invoke-WebRequest -Uri https://aka.ms/PowerAppsCLI.msi -OutFile PowerApps.msi
-        Write-Host "Installing PAC CLI..."
-        Start-Process msiexec.exe -Wait -ArgumentList '/i PowerAppsCLI.msi /quiet'
-        Write-Host "Locating PAC CLI..."
+        Write-Host "Installing Chocolatey..."
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
 
-        $possiblePaths = @(
-          "C:\Program Files\Power Platform Tools\pac.exe",
-          "C:\Program Files (x86)\Power Platform Tools\pac.exe"
-        )
+        Write-Host "Installing Power Platform CLI..."
+        choco install powerplatform-cli -y
 
-        $pacExe = $possiblePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
-
-        if ($pacExe)
-          {
-            Write-Host "PAC CLI installed successfully."
-            & $pacExe --version
-          } else {
-            Write-Error "PAC CLI not found at $pacExe"
-            exit 1
-          }
+        Write-Host "Verifying PAC CLI installation..."
+        pac --version
 
     # Step 0: Authenticate to DEV environment
     - name: Authenticate with Power Platform
