@@ -20,7 +20,7 @@ jobs:
         Write-Host "Downloading PAC CLI..."
         Invoke-WebRequest -Uri https://aka.ms/PowerAppsCLI.msi -OutFile PowerApps.msi
         Write-Host "Installing PAC CLI..."
-        Start-Process msiexec.exe -Wait -ArgumentsList '/i PowerAppsCLI.msi /quiet'
+        Start-Process msiexec.exe -Wait -ArgumentList '/i PowerAppsCLI.msi /quiet'
         Write-Host "Verifying PAC CLI installation..."
         pac --version
     
