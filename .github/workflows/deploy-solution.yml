@@ -20,14 +20,13 @@ jobs:
 
     # Step 1: Export solution from Dev
     - name: Export solutions from Dev
-      uses: microsoft/powerplatform-actions/export-solution@v1
+      uses: microsoft/powerplatform-actions/export-solution@v0.7.1
       with:
         environment-url: ${{ secrets.PP_ENV_URL  }}
         user-name: ${{ secrets.PP_USERNAME  }}
         password-secret: ${{ secrets.PP_PASSWORD  }}
         solution-name: UnderwritingWorkbench
-        solution-output-file: = UnderwritingWorkbench.zip
-        working-directory: Solutions
+        solution-output-file: UnderwritingWorkbench.zip
         managed: false
         overwrite: true
 
@@ -45,6 +44,6 @@ jobs:
         environment-url: ${{ secrets.PP_ENV_URL  }}
         user-name: ${{ secrets.PP_USERNAME  }}
         password-secret: ${{ secrets.PP_PASSWORD  }}
-        solution-input-file: Solutions/UnderwritingWorkbenchTarget.zip
+        solution-input-file: UnderwritingWorkbenchTarget.zip
         overwrite-unmanaged-customizations: true
         publish-changes: true
