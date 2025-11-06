@@ -20,9 +20,8 @@ jobs:
       run: |
         dotnet tool install --global Microsoft.PowerApps.CLI.Tool
         $env:PATH += ";$env:USERPROFILE\.dotnet\tools"
-        pac --version
-
-
+        pac
+        
     # Step 1: Export solution from Dev
     - name: Export solutions from Dev
       shell: pwsh
