@@ -21,21 +21,17 @@ jobs:
         Invoke-WebRequest -Uri https://aka.ms/PowerAppsCLI.msi -OutFile PowerApps.msi
         Write-Host "Installing PAC CLI..."
         Start-Process msiexec.exe -Wait -ArgumentList '/i PowerAppsCLI.msi /quiet'
-
-    - name: Add PAC CLI to PATH
-      shell: pwsh
-      run: |
-        $pacPath = "C:\Program Files\Power Platform Tools"
-        $env:PATH += ";$pacPath"
+        $pacExe = "C:\Program Files\Power Platform Tools\pac.exe"
         Write-Host "Verifying PAC CLI installation..."
-        pac
-    
+        & $pacExe --version
+
     # Step 0: Authenticate to DEV environment
     - name: Authenticate with Power Platform
       shell: pwsh
       run: |
-        pac auth create --url $env:PP_ENV_URL --username $nev:PP_USERNAME --password $env:PP_PASSWORD
-        pac org select --name DevEnv
+        $pacExe = "C:\Program Files\Power Platform Tools\pac.exe"
+        & $pacExe auth create --url $env:PP_ENV_URL --username $nev:PP_USERNAME --password $env:PP_PASSWORD
+        & $pacExe org select --name DevEnv
       env:
         PP_ENV_URL: ${{ secrets.PP_ENV_URL  }}
         PP_USERNAME: ${{ secrets.PP_USERNAME  }}
