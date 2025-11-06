@@ -18,14 +18,6 @@ jobs:
     - name: Install Power Platform CLI
       uses: microsoft/powerplatform-actions/actions-install@v1
 
-    # Step 0: Authenticate to DEV environment
-    - name: Authenticate to Dev
-      uses: microsoft/powerplatform-actions/authenticate@v1
-      with:
-        environment-url: ${{ secrets.PP_ENV_URL  }}
-        user-name: ${{ secrets.PP_USERNAME  }}
-        password-secret: ${{ secrets.PP_PASSWORD  }}
-
     # Step 1: Export solution from Dev
     - name: Export solutions from Dev
       uses: microsoft/powerplatform-actions/export-solution@v1
