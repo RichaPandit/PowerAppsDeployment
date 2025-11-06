@@ -28,7 +28,7 @@ jobs:
         $pacPath = "C:\Program Files\Power Platform Tools"
         $env:PATH += ";$pacPath"
         Write-Host "Verifying PAC CLI installation..."
-        pac --version
+        pac
     
     # Step 0: Authenticate to DEV environment
     - name: Authenticate with Power Platform
