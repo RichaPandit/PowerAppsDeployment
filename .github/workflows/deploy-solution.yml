@@ -22,8 +22,14 @@ jobs:
         Write-Host "Installing PAC CLI..."
         Start-Process msiexec.exe -Wait -ArgumentList '/i PowerAppsCLI.msi /quiet'
         $pacExe = "C:\Program Files\Power Platform Tools\pac.exe"
-        Write-Host "Verifying PAC CLI installation..."
-        & $pacExe --version
+        if (Test-Path $pacExe)
+          {
+            Write-Host "PAC CLI installed successfully."
+            & $pacExe --version
+          } else {
+            Write-Error "PAC CLI not found at $pacExe"
+            exit 1
+          }
 
     # Step 0: Authenticate to DEV environment
     - name: Authenticate with Power Platform
