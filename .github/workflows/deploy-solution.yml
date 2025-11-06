@@ -14,59 +14,45 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    - name: Install Power Platform CLI via Chocolatey
-      shell: pwsh
-      run: |
-        Write-Host "Installing Chocolatey..."
-        Set-ExecutionPolicy Bypass -Scope Process -Force
-        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-
-        Write-Host "Installing Power Platform CLI..."
-        choco install powerplatform-cli -y
-
-        Write-Host "Verifying PAC CLI installation..."
-        pac --version
+    # Step 1: Install Power Platform CLI (via official action)
+    - name: Install Power Platform CLI
+      uses: microsoft/powerplatform-actions/actions-install@v1
 
     # Step 0: Authenticate to DEV environment
-    - name: Authenticate with Power Platform
-      shell: pwsh
-      run: |
-        $pacExe = "C:\Program Files\Power Platform Tools\pac.exe"
-        & $pacExe auth create --url $env:PP_ENV_URL --username $nev:PP_USERNAME --password $env:PP_PASSWORD
-        & $pacExe org select --name DevEnv
-      env:
+    - name: Authenticate to Dev
+      uses: microsoft/powerplatform-actions/authenticate@v1
+      with:
         PP_ENV_URL: ${{ secrets.PP_ENV_URL  }}
         PP_USERNAME: ${{ secrets.PP_USERNAME  }}
         PP_PASSWORD: ${{ secrets.PP_PASSWORD  }}
 
     # Step 1: Export solution from Dev
     - name: Export solutions from Dev
-      shell: pwsh
-      run: |
-        $solutionName = "UnderwritingWorkbench"
-        $exportPath = "$(Resolve-Path .)\Solutions\$solutionName.zip"
-        pac solution export --name $solutionName --path $exportPath --managed false --overwrite
-        Write-Host "Solution exported successfully from Dev!"
+      uses: microsoft/powerplatform-actions/export-solution@v1
+      with:
+        PP_ENV_URL: ${{ secrets.PP_ENV_URL  }}
+        PP_USERNAME: ${{ secrets.PP_USERNAME  }}
+        PP_PASSWORD: ${{ secrets.PP_PASSWORD  }}
+        solution-name: UnderwritingWorkbench
+        solution-output-file: = UnderwritingWorkbench.zip
+        working-directory: Solutions
+        managed: false
+        overwrite: true
 
-    # Step 5: Run your custom validation script
+    # Step 5: Run Best Practice Validation
     - name: Run Best Practice Validation
       shell: pwsh
       run: |
         pwsh ./scripts/validate-solution.ps1 -solutionPath .\UnpackedSolution
 
-    # Step 6: Deploy to Test (only if all previous steps pass)
-    - name: Deploy to Test
+    # Step 6: Authentictate to Test Environment (only if all previous steps pass)
+    - name: Import solution to Test
       if: success()
-      shell: pwsh
-      run: |
-        pac auth create --url $env:PP_ENV_URL --username $nev:PP_USERNAME --password $env:PP_PASSWORD
-        pac org select --name TestEnv
-        $solutionName = "UnderwritingWorkbenchTarget"
-        $solutionZip = "$(Resolve-Path .)\Solutions\$solutionName.zip"
-        pac solution import --path $solutionZip --overwrite --publish-changes
-        Write-Host "Successfully deployed to Test environment."
-      env:
+      uses: microsoft/powerplatform-actions/import-solution@v1
+      with:
         PP_ENV_URL: ${{ secrets.PP_ENV_URL  }}
         PP_USERNAME: ${{ secrets.PP_USERNAME  }}
         PP_PASSWORD: ${{ secrets.PP_PASSWORD  }}
+        solution-input-file: Solutions/UnderwritingWorkbenchTarget.zip
+        overwrite-unmanaged-customizations: true
+        publish-changes: true
