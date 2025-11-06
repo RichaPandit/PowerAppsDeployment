@@ -14,21 +14,26 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
-    # Step 1: Install Power Platform CLI (via official action)
-    - name: Install Power Platform CLI
-      uses: microsoft/powerplatform-actions/actions-install@v1
+    # Step 1: Install Power Platform CLI via .NET
+    - name: Install Power Platform CLI via .NET
+      shell: pwsh
+      run: |
+        dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+        $env:PATH += ";$env:USERPROFILE\.dotnet\tools"
+        pac --version
+
 
     # Step 1: Export solution from Dev
     - name: Export solutions from Dev
-      uses: microsoft/powerplatform-actions/export-solution@v0.7.1
-      with:
-        environment-url: ${{ secrets.PP_ENV_URL  }}
-        user-name: ${{ secrets.PP_USERNAME  }}
-        password-secret: ${{ secrets.PP_PASSWORD  }}
-        solution-name: UnderwritingWorkbench
-        solution-output-file: UnderwritingWorkbench.zip
-        managed: false
-        overwrite: true
+      shell: pwsh
+      run: |
+        pac auth create --url $env:PP_ENV_URL --username $env:PP_USERNAME --password $env:PP_PASSWORD
+        pac org select --name DevEnv
+        pac solution export --name UnderwritingWorkbench --path Solutions/UnderwritingWorkbench.zip --managed false --overwrite
+      env:
+        PP_ENV_URL: ${{ secrets.PP_ENV_URL }}
+        PP_USERNAME: ${{ secrets.PP_USERNAME }}
+        PP_PASSWORD: ${{ secrets.PP_PASSWORD }}
 
     # Step 5: Run Best Practice Validation
     - name: Run Best Practice Validation
