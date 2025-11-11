@@ -29,7 +29,7 @@ jobs:
         pac auth create --environment $env:PP_ENV_URL `
                         --applicationId $env:PP_APP_ID `
                         --clientSecret $env:PP_CLIENT_SECRET `
-                        --tenantId $env:PP_TENANT_ID
+                        --tenant $env:PP_TENANT_ID
       env:
         PP_ENV_URL: ${{ secrets.PP_ENV_URL }}
         PP_APP_ID: ${{ secrets.PP_APP_ID }}
