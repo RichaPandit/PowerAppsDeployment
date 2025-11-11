@@ -21,33 +21,53 @@ jobs:
         dotnet tool install --global Microsoft.PowerApps.CLI.Tool
         $env:PATH += ";$env:USERPROFILE\.dotnet\tools"
         pac
-        
-    # Step 1: Export solution from Dev
+
+    # Step 2: Authenticate using Service Principal
+    - name: Authenticate to Power Platform
+      shell: pwsh
+      run: |
+        pac auth create --environment $env:PP_ENV_URL `
+                        --applicationId $env:PP_APP_ID `
+                        --clientSecret $env:PP_CLIENT_SECRET `
+                        --tenantId $env:PP_TENANT_ID
+      env:
+        PP_ENV_URL: ${{ secrets.PP_ENV_URL }}
+        PP_APP_ID: ${{ secrets.PP_APP_ID }}
+        PP_CLIENT_SECRET: ${{ secrets.PP_CLIENT_SECRET }}
+        PP_TENANT_ID: ${{ secrets.PP_TENANT_ID }}
+
+    
+    # Step 3: Export solution from Dev
     - name: Export solutions from Dev
       shell: pwsh
       run: |
-        pac auth create --url $env:PP_ENV_URL --username $env:PP_USERNAME --password $env:PP_PASSWORD
-        pac org select --name DevEnv
-        pac solution export --name UnderwritingWorkbench --path Solutions/UnderwritingWorkbench.zip --managed false --overwrite
-      env:
-        PP_ENV_URL: ${{ secrets.PP_ENV_URL }}
-        PP_USERNAME: ${{ secrets.PP_USERNAME }}
-        PP_PASSWORD: ${{ secrets.PP_PASSWORD }}
+        $solutionName = "UnderwritingWorkbench"
+        $exportPath = "$(Resolve-Path .)\Solutions\$solutionName.zip"
+        pac solution export --name $solutionName --path $exportPath --managed false --overwrite
+        Write-Host "Solution exported successfully from Dev!"
 
-    # Step 5: Run Best Practice Validation
+    # Step 4: Run Best Practice Validation
     - name: Run Best Practice Validation
       shell: pwsh
       run: |
         pwsh ./scripts/validate-solution.ps1 -solutionPath .\UnpackedSolution
 
-    # Step 6: Authentictate to Test Environment (only if all previous steps pass)
+
+    # Step 5: Import solution to Test
     - name: Import solution to Test
       if: success()
-      uses: microsoft/powerplatform-actions/import-solution@v1
-      with:
-        environment-url: ${{ secrets.PP_ENV_URL  }}
-        user-name: ${{ secrets.PP_USERNAME  }}
-        password-secret: ${{ secrets.PP_PASSWORD  }}
-        solution-input-file: UnderwritingWorkbenchTarget.zip
-        overwrite-unmanaged-customizations: true
-        publish-changes: true
+      shell: pwsh
+      run: |
+        pac auth create --environment $env:PP_ENV_URL `
+                        --applicationId $env:PP_APP_ID `
+                        --clientSecret $env:PP_CLIENT_SECRET `
+                        --tenantId $env:PP_TENANT_ID
+        $solutionName = "UnderwritingWorkbenchTarget"
+        $solutionZip = "$(Resolve-Path .)\Solutions\$solutionName.zip"
+        pac solution import --path $solutionZip --overwrite --publish-changes
+        Write-Host "Successfully deployed to Test environment."
+      env:
+        PP_ENV_URL: ${{ secrets.PP_ENV_URL }}
+        PP_APP_ID: ${{ secrets.PP_APP_ID }}
+        PP_CLIENT_SECRET: ${{ secrets.PP_CLIENT_SECRET }}
+        PP_TENANT_ID: ${{ secrets.PP_TENANT_ID }}
