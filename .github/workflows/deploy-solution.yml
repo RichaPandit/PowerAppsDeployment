@@ -46,6 +46,14 @@ jobs:
         pac solution export --name $solutionName --path $exportPath --managed false --overwrite
         Write-Host "Solution exported successfully from Dev!"
 
+    # Step 3.1: Rename exported solution for Test import
+    - name: Rename exported solution
+      shell: pwsh
+      run: |
+        $sourcePath = "$(Resolve-Path .)\Solutions\UnderwritingWorkbench.zip"
+        $targetPath = "$(Resolve-Path .)\Solutions\UnderwritingWorkbenchTarget.zip"
+        Rename-Item -Path $sourcePath -NewName (Split-Path $targetPath -Leaf)
+        Write-Host "✅ Solution renamed to UnderwritingWorkbenchTarget.zip"
 
     # Step 3.4: Download and extract SolutionPackager.exe from NuGet
     - name: Download SolutionPackager.exe
@@ -75,7 +83,7 @@ jobs:
     - name: Unpack solution using SolutionPackager
       shell: pwsh
       run: |
-        $solutionZip = "$(Resolve-Path .)\Solutions\UnderwritingWorkbench.zip"
+        $solutionZip = "$(Resolve-Path .)\Solutions\UnderwritingWorkbenchTarget.zip"
         $unpackPath = "$(Resolve-Path .)\UnpackedSolution"
         $solutionPackagerPath = "$(Resolve-Path .)\tools\CoreTools\content\bin\coretools\SolutionPackager.exe"
         
@@ -91,7 +99,7 @@ jobs:
       shell: pwsh
       run: |
         $solutionPath = "$(Resolve-Path .)\UnpackedSolution"
-        $solutionZip = "$(Resolve-Path .)\Solutions\UnderwritingWorkbench.zip"
+        $solutionZip = "$(Resolve-Path .)\Solutions\UnderwritingWorkbenchTarget.zip"
         $solutionPackagerPath = "$(Resolve-Path .)\tools\SolutionPackager.exe"
 
         pwsh ./scripts/validate-solution.ps1 `
