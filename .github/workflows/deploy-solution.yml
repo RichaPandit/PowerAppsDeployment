@@ -112,7 +112,7 @@ jobs:
       if: success()
       shell: pwsh
       run: |
-        pac auth create --environment $env:PP_ENV_URL `
+        pac auth create --environment $env:PP_ENV_TEST_URL `
                         --applicationId $env:PP_APP_ID `
                         --clientSecret $env:PP_CLIENT_SECRET `
                         --tenant $env:PP_TENANT_ID
@@ -121,7 +121,7 @@ jobs:
         pac solution import --path $solutionZip --force-overwrite --publish-changes
         Write-Host "Successfully deployed to Test environment."
       env:
-        PP_ENV_URL: ${{ secrets.PP_ENV_URL }}
+        PP_ENV_TEST_URL: ${{ secrets.PP_ENV_TEST_URL }}
         PP_APP_ID: ${{ secrets.PP_APP_ID }}
         PP_CLIENT_SECRET: ${{ secrets.PP_CLIENT_SECRET }}
         PP_TENANT_ID: ${{ secrets.PP_TENANT_ID }}
