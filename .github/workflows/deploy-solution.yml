@@ -64,8 +64,6 @@ jobs:
         Expand-Archive -Path $downloadPath -DestinationPath $extractPath -Force
 
         $solutionPackagerPath = "$extractPath\content\bin\coretools\SolutionPackager.exe"
-        $solutionPackagerPath = "$(Resolve-Path .)\tools\CoreTools\content\bin\coretools\SolutionPackager.exe"
-        $solutionPackagerPath = Get-ChildItem "$(Resolve-Path .)\tools\CoreTools" -Recurse -Filter "SolutionPackager.exe" | Select-Object -First 1 | Select-Object -ExpandProperty FullName
         if (!(Test-Path $solutionPackagerPath)) {
           throw "❌ SolutionPackager.exe not found after extraction."
         }
@@ -79,8 +77,8 @@ jobs:
       run: |
         $solutionZip = "$(Resolve-Path .)\Solutions\UnderwritingWorkbench.zip"
         $unpackPath = "$(Resolve-Path .)\UnpackedSolution"
-        $solutionPackagerPath = "$(Resolve-Path .)\tools\SolutionPackager.exe"
-
+        $solutionPackagerPath = "$(Resolve-Path .)\tools\CoreTools\content\bin\coretools\SolutionPackager.exe"
+        
         if (!(Test-Path $solutionPackagerPath)) {
           throw "SolutionPackager.exe not found at $solutionPackagerPath"
         }
