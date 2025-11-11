@@ -83,7 +83,7 @@ jobs:
           throw "SolutionPackager.exe not found at $solutionPackagerPath"
         }
 
-        & $solutionPackagerPath /action:Extract /zipfile:$solutionZip /folder:$unpackPath /packagetype:Managed
+        & $solutionPackagerPath /action:Extract /zipfile:$solutionZip /folder:$unpackPath /packagetype:Unmanaged
         Write-Host "✅ Solution unpacked to $unpackPath"
 
     # Step 4: Run Best Practice Validation
