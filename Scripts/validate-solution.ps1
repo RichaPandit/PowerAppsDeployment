@@ -1,5 +1,7 @@
 param (
-    [string]$solutionPath = ".\UnpackedSolution"
+    [string]$solutionPath = ".\UnpackedSolution",
+    [string]$solutionZip = ".\SolutionZip\YourSolution.zip",
+    [string]$solutionPackagerPath = ".\tools\SolutionPackager.exe"
 )
 
 Write-Host "🔍 Running Power Platform Best Practice Validation..."
@@ -7,8 +9,26 @@ $failed = $false
 
 # Check if the solution path exists
 if (!(Test-Path $solutionPath)) {
-    Write-Error "❌ ERROR: Solution path '$solutionPath' does not exist. Please ensure the solution has been unpacked correctly."
-    exit 1
+    Write-Warning "⚠️ Solution path '$solutionPath' does not exist. Attempting to unpack solution..."
+
+    if (!(Test-Path $solutionZip)) {
+        Write-Error "❌ ERROR: Solution zip file '$solutionZip' not found. Cannot unpack."
+        exit 1
+    }
+
+    if (!(Test-Path $solutionPackagerPath)) {
+        Write-Error "❌ ERROR: SolutionPackager.exe not found at '$solutionPackagerPath'."
+        exit 1
+    }
+
+    & $solutionPackagerPath /action:Extract /zipfile:$solutionZip /folder:$solutionPath /packagetype:Managed
+
+    if (!(Test-Path $solutionPath)) {
+        Write-Error "❌ ERROR: Unpacking failed. '$solutionPath' still does not exist."
+        exit 1
+    }
+
+    Write-Host "✅ Solution unpacked successfully."
 }
 
 # --- 1 Validate Model-Driven Apps ---
