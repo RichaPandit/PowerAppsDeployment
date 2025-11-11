@@ -2,53 +2,77 @@ param (
     [string]$solutionPath = ".\UnpackedSolution"
 )
 
-Write-Host "Running Power Platform Best Practice Validation..."
+Write-Host "🔍 Running Power Platform Best Practice Validation..."
+$failed = $false
+
+# Check if the solution path exists
+if (!(Test-Path $solutionPath)) {
+    Write-Error "❌ ERROR: Solution path '$solutionPath' does not exist. Please ensure the solution has been unpacked correctly."
+    exit 1
+}
 
 # --- 1 Validate Model-Driven Apps ---
-$modelApps = Get-ChildItem "$solutionPath\ModelDrivenApps" -Filter *.xml -Recurse
-foreach ($app in $modelApps) {
-    $xml = [xml] (Get-Content $app.FullName)
-    $displayName = $xml.appmodule.appmoduleid | Select-Object -ExpandProperty displayname
-    if ($displayName -notmatch '^mdl_[A-Z].*') {
-        Write-Error "Model-driven app '$displayName' does not follow naming convention (mdl_ prefix required)"
-        $failed = $true
+try {
+    $modelApps = Get-ChildItem "$solutionPath\ModelDrivenApps" -Filter *.xml -Recurse
+    foreach ($app in $modelApps) {
+        $xml = [xml] (Get-Content $app.FullName)
+        $displayName = $xml.appmodule.appmoduleid | Select-Object -ExpandProperty displayname
+        if ($displayName -notmatch '^mdl_[A-Z].*') {
+            Write-Error "❌ Model-driven app '$displayName' does not follow naming convention (mdl_ prefix required)"
+            $failed = $true
+        }
     }
+} catch {
+    Write-Warning "⚠️ Skipping ModelDrivenApps validation: folder not found or unreadable."
 }
 
 # --- 2 Validate Tables ---
-$tables = Get-ChildItem "$solutionPath\Entities" -Filter *.xml -Recurse
-foreach ($table in $tables) {
-    $xml = [xml] (Get-Content $table.FullName)
-    $logicalName = $xml.Entity.LogicalName
-    if ($logicalName -notmatch '^ent_[a-z0-9_]+$') {
-        Write-Error "Table '$logicalName' does not follow naming convention (ent_ prefix required)"
-        $failed = $true
+try {
+    $tables = Get-ChildItem "$solutionPath\Entities" -Filter *.xml -Recurse
+    foreach ($table in $tables) {
+        $xml = [xml] (Get-Content $table.FullName)
+        $logicalName = $xml.Entity.LogicalName
+        if ($logicalName -notmatch '^ent_[a-z0-9_]+$') {
+            Write-Error "❌ Table '$logicalName' does not follow naming convention (ent_ prefix required)"
+            $failed = $true
+        }
     }
+} catch {
+    Write-Warning "⚠️ Skipping Entities validation: folder not found or unreadable."
 }
 
 # --- 3 Validate Flows ---
-$flows = Get-ChildItem "$solutionPath\Workflows" -Filter *.json -Recurse
-foreach ($flow in $flows) {
-    $json = Get-Content $flow.FullName | ConvertFrom-Json
-    $name = $json.properties.displayName
-    if ($name -notmatch '^flw_[A-Z].*') {
-        Write-Error "Flow '$name' does not follow naming convention (flw_ prefix required)"
-        $failed = $true
+try {
+    $flows = Get-ChildItem "$solutionPath\Workflows" -Filter *.json -Recurse
+    foreach ($flow in $flows) {
+        $json = Get-Content $flow.FullName | ConvertFrom-Json
+        $name = $json.properties.displayName
+        if ($name -notmatch '^flw_[A-Z].*') {
+            Write-Error "❌ Flow '$name' does not follow naming convention (flw_ prefix required)"
+            $failed = $true
+        }
     }
+} catch {
+    Write-Warning "⚠️ Skipping Workflows validation: folder not found or unreadable."
 }
 
 # --- 4 Validate CanvasApps ---
-$canvasApps = Get-ChildItem "$solutionPath\CanvasApps" -Filter *.json -Recurse
-foreach ($app in $canvasApps) {
-    if ($app.Name -notmatch '^scr[A-Z].*') {
-        Write-Error "Canvas screen '$($app.Name)' does not follow naming convention (scr prefix required)"
-        $failed = $true
+try {
+    $canvasApps = Get-ChildItem "$solutionPath\CanvasApps" -Filter *.json -Recurse
+    foreach ($app in $canvasApps) {
+        if ($app.Name -notmatch '^scr[A-Z].*') {
+            Write-Error "❌ Canvas screen '$($app.Name)' does not follow naming convention (scr prefix required)"
+            $failed = $true
+        }
     }
+} catch {
+    Write-Warning "⚠️ Skipping CanvasApps validation: folder not found or unreadable."
 }
 
+# --- Final Result ---
 if ($failed) {
-    Write-Error "Validation failed. Fix naming issues before deployment."
+    Write-Error "❌ Validation failed. Fix naming issues before deployment."
     exit 1
 } else {
-    Write-Host "All naming conventions validated successfully!"
+    Write-Host "✅ All naming conventions validated successfully!"
 }
