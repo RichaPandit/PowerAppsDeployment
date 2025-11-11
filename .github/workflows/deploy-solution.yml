@@ -107,7 +107,7 @@ jobs:
         pac auth create --environment $env:PP_ENV_URL `
                         --applicationId $env:PP_APP_ID `
                         --clientSecret $env:PP_CLIENT_SECRET `
-                        --tenantId $env:PP_TENANT_ID
+                        --tenant $env:PP_TENANT_ID
         $solutionName = "UnderwritingWorkbenchTarget"
         $solutionZip = "$(Resolve-Path .)\Solutions\$solutionName.zip"
         pac solution import --path $solutionZip --overwrite --publish-changes
