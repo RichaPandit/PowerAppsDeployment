@@ -110,7 +110,7 @@ jobs:
                         --tenant $env:PP_TENANT_ID
         $solutionName = "UnderwritingWorkbenchTarget"
         $solutionZip = "$(Resolve-Path .)\Solutions\$solutionName.zip"
-        pac solution import --path $solutionZip --overwrite --publish-changes
+        pac solution import --path $solutionZip --force-overwrite --publish-changes
         Write-Host "Successfully deployed to Test environment."
       env:
         PP_ENV_URL: ${{ secrets.PP_ENV_URL }}
