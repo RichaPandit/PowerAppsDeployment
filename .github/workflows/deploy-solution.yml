@@ -51,9 +51,14 @@ jobs:
     - name: Download SolutionPackager.exe
       shell: pwsh
       run: |
+        $toolsPath = "$(Resolve-Path .)\tools"
+        if (!(Test-Path $toolsPath)) {
+          New-Item -ItemType Directory -Path $toolsPath | Out-Null
+        }
+
         $nugetUrl = "https://www.nuget.org/api/v2/package/Microsoft.CrmSdk.CoreTools"
-        $downloadPath = "$(Resolve-Path .)\tools\CoreTools.nupkg"
-        $extractPath = "$(Resolve-Path .)\tools\CoreTools"
+        $downloadPath = "$toolsPath\CoreTools.nupkg"
+        $extractPath = "$toolsPath\CoreTools"
 
         Invoke-WebRequest -Uri $nugetUrl -OutFile $downloadPath
         Expand-Archive -Path $downloadPath -DestinationPath $extractPath -Force
