@@ -9,18 +9,33 @@ on:
 jobs:
   deploy:
     runs-on: windows-latest
+    env:
+      PP_SOLUTION_NAME: ${{ vars.PP_SOLUTION_NAME }}
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
+
+    - name: Validate solution configuration
+      shell: pwsh
+      run: |
+        if ([string]::IsNullOrWhiteSpace($env:PP_SOLUTION_NAME)) {
+          throw "Repository variable PP_SOLUTION_NAME must be set to the solution unique name."
+        }
 
     # Step 1: Install Power Platform CLI via .NET
     - name: Install Power Platform CLI via .NET
       shell: pwsh
       run: |
         dotnet tool install --global Microsoft.PowerApps.CLI.Tool
+        if ($LASTEXITCODE -ne 0) {
+          throw "Power Platform CLI installation failed with exit code $LASTEXITCODE."
+        }
         $env:PATH += ";$env:USERPROFILE\.dotnet\tools"
         pac
+        if ($LASTEXITCODE -ne 0) {
+          throw "Power Platform CLI check failed with exit code $LASTEXITCODE."
+        }
 
     # Step 2: Authenticate using Service Principal
     - name: Authenticate to Power Platform
@@ -30,6 +45,9 @@ jobs:
                         --applicationId $env:PP_APP_ID `
                         --clientSecret $env:PP_CLIENT_SECRET `
                         --tenant $env:PP_TENANT_ID
+        if ($LASTEXITCODE -ne 0) {
+          throw "Dev environment authentication failed with exit code $LASTEXITCODE."
+        }
       env:
         PP_ENV_URL: ${{ secrets.PP_ENV_URL }}
         PP_APP_ID: ${{ secrets.PP_APP_ID }}
@@ -41,19 +59,25 @@ jobs:
     - name: Export solutions from Dev
       shell: pwsh
       run: |
-        $solutionName = "UnderwritingWorkbench"
-        $exportPath = "$(Resolve-Path .)\Solutions\$solutionName.zip"
+        $solutionName = $env:PP_SOLUTION_NAME
+        $solutionsPath = Join-Path (Resolve-Path .).Path "Solutions"
+        New-Item -ItemType Directory -Path $solutionsPath -Force | Out-Null
+        $exportPath = Join-Path $solutionsPath "$solutionName.zip"
         pac solution export --name $solutionName --path $exportPath --managed false --overwrite
+        if ($LASTEXITCODE -ne 0) {
+          throw "Solution export failed with exit code $LASTEXITCODE."
+        }
         Write-Host "Solution exported successfully from Dev!"
 
     # Step 3.1: Rename exported solution for Test import
     - name: Rename exported solution
       shell: pwsh
       run: |
-        $sourcePath = "$(Resolve-Path .)\Solutions\UnderwritingWorkbench.zip"
-        $targetPath = "$(Resolve-Path .)\Solutions\UnderwritingWorkbenchTarget.zip"
+        $solutionsPath = Join-Path (Resolve-Path .).Path "Solutions"
+        $sourcePath = Join-Path $solutionsPath "$env:PP_SOLUTION_NAME.zip"
+        $targetPath = Join-Path $solutionsPath "$($env:PP_SOLUTION_NAME)Target.zip"
         Rename-Item -Path $sourcePath -NewName (Split-Path $targetPath -Leaf)
-        Write-Host "✅ Solution renamed to UnderwritingWorkbenchTarget.zip"
+        Write-Host "✅ Solution renamed to $([System.IO.Path]::GetFileName($targetPath))"
 
     # Step 3.4: Download and extract SolutionPackager.exe from NuGet
     - name: Download SolutionPackager.exe
@@ -83,9 +107,10 @@ jobs:
     - name: Unpack solution using SolutionPackager
       shell: pwsh
       run: |
-        $solutionZip = "$(Resolve-Path .)\Solutions\UnderwritingWorkbenchTarget.zip"
-        $unpackPath = "$(Resolve-Path .)\UnpackedSolution"
-        $solutionPackagerPath = "$(Resolve-Path .)\tools\CoreTools\content\bin\coretools\SolutionPackager.exe"
+        $repositoryPath = (Resolve-Path .).Path
+        $solutionZip = Join-Path (Join-Path $repositoryPath "Solutions") "$($env:PP_SOLUTION_NAME)Target.zip"
+        $unpackPath = Join-Path $repositoryPath "UnpackedSolution"
+        $solutionPackagerPath = Join-Path $repositoryPath "tools\CoreTools\content\bin\coretools\SolutionPackager.exe"
         
         if (!(Test-Path $solutionPackagerPath)) {
           throw "SolutionPackager.exe not found at $solutionPackagerPath"
@@ -98,9 +123,10 @@ jobs:
     - name: Run Best Practice Validation
       shell: pwsh
       run: |
-        $solutionPath = "$(Resolve-Path .)\UnpackedSolution"
-        $solutionZip = "$(Resolve-Path .)\Solutions\UnderwritingWorkbenchTarget.zip"
-        $solutionPackagerPath = "$(Resolve-Path .)\tools\SolutionPackager.exe"
+        $repositoryPath = (Resolve-Path .).Path
+        $solutionPath = Join-Path $repositoryPath "UnpackedSolution"
+        $solutionZip = Join-Path (Join-Path $repositoryPath "Solutions") "$($env:PP_SOLUTION_NAME)Target.zip"
+        $solutionPackagerPath = Join-Path $repositoryPath "tools\SolutionPackager.exe"
 
         pwsh ./scripts/validate-solution.ps1 `
           -solutionPath $solutionPath `
@@ -116,9 +142,15 @@ jobs:
                         --applicationId $env:PP_APP_ID `
                         --clientSecret $env:PP_CLIENT_SECRET `
                         --tenant $env:PP_TENANT_ID
-        $solutionName = "UnderwritingWorkbenchTarget"
-        $solutionZip = "$(Resolve-Path .)\Solutions\$solutionName.zip"
+        if ($LASTEXITCODE -ne 0) {
+          throw "Test environment authentication failed with exit code $LASTEXITCODE."
+        }
+        $solutionsPath = Join-Path (Resolve-Path .).Path "Solutions"
+        $solutionZip = Join-Path $solutionsPath "$($env:PP_SOLUTION_NAME)Target.zip"
         pac solution import --path $solutionZip --force-overwrite --publish-changes
+        if ($LASTEXITCODE -ne 0) {
+          throw "Solution import failed with exit code $LASTEXITCODE."
+        }
         Write-Host "Successfully deployed to Test environment."
       env:
         PP_ENV_TEST_URL: ${{ secrets.PP_ENV_TEST_URL }}

@@ -1,28 +1,48 @@
-# Powershell script to export Canvas App solution from Dev environment
+param(
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string]$EnvironmentUrl,
 
-# Variables
-$solutionName = "UnderwritingWorkbench"
-$exportFolder="C:\Users\ripandit\PowerAppsProjects\ExportedSolutions"
-$devEnvUrl="https://richasolsdev.crm11.dynamics.com"
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string]$SolutionName,
 
-# Make sure PAC CLI is available
-Write-Host "Checking Power Platform CLI..."
-pac --version
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string]$ExportPath
+)
 
-# Authenticate (use device-login)
-Write-Host "Authenticating to Power Platform environment..."
-pac auth create --url $devEnvUrl --name DevEnv
+$ErrorActionPreference = "Stop"
 
-# Create export folder if it doesn't exist
-if (!(Test-Path $exportFolder)) {
-    New-Item -ItemType Directory -Path $exportFolder | Out-Null
+function Invoke-Pac {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Operation
+    )
+
+    & pac @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "PAC $Operation failed with exit code $LASTEXITCODE."
+    }
 }
 
-# Build full export path
-$exportPath = Join-Path -Path $exportFolder -ChildPath "$solutionName.zip"
+$resolvedExportPath = [System.IO.Path]::GetFullPath($ExportPath)
+$exportDirectory = Split-Path -Parent $resolvedExportPath
 
-# Export the solution as unmanaged
-Write-Host "Exporting $solutionName from Dev environment..."
-pac solution export --name $solutionName --path $exportPath --managed false --overwrite
+if (!(Test-Path -LiteralPath $exportDirectory)) {
+    New-Item -ItemType Directory -Path $exportDirectory -Force | Out-Null
+}
+
+Write-Host "Checking Power Platform CLI..."
+Invoke-Pac -Arguments @("--version") -Operation "version check"
+
+Write-Host "Authenticating to Power Platform environment..."
+Invoke-Pac -Arguments @("auth", "create", "--url", $EnvironmentUrl, "--name", "DevEnv") -Operation "authentication"
+
+Write-Host "Exporting $SolutionName from the specified environment..."
+Invoke-Pac -Arguments @("solution", "export", "--name", $SolutionName, "--path", $resolvedExportPath, "--managed", "false", "--overwrite") -Operation "solution export"
 
 Write-Host "Export completed successfully!"
