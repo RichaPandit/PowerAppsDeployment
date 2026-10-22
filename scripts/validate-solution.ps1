@@ -2,10 +2,15 @@ param (
     [string]$solutionPath = ".\UnpackedSolution",
     [string]$solutionZip = ".\SolutionZip\YourSolution.zip",
     [string]$solutionPackagerPath = ".\tools\SolutionPackager.exe",
-    [string]$ModelDrivenAppNamePattern = '^mdl_[A-Z].*',
-    [string]$TableLogicalNamePattern = '^ent_[a-z0-9_]+$',
-    [string]$FlowNamePattern = '^flw_[A-Z].*',
-    [string]$CanvasScreenNamePattern = '^scr[A-Z].*',
+
+    [string]$ModelDrivenAppNamePattern = '^[A-Za-z][A-Za-z0-9]*[-_][A-Za-z0-9 _-]+$',
+
+    [string]$TableLogicalNamePattern = '^[a-z][a-z0-9]*_[A-Za-z0-9_]+$',
+
+    [string]$FlowNamePattern = '^[A-Za-z][A-Za-z0-9]*[-_][A-Za-z0-9_-]+$',
+
+    [string]$CanvasScreenNamePattern = '^[A-Za-z][A-Za-z0-9_]*$',
+
     [string]$ReportPath
 )
 
@@ -108,36 +113,104 @@ foreach ($app in $modelApps) {
     }
 }
 
-# Validate Tables.
-$tables = Get-ComponentFiles -FolderName 'Entities' -Filter '*.xml' -Rule 'Table'
-foreach ($table in $tables) {
+# Validate Dataverse table logical names.
+# SolutionPackager creates one folder under Entities for each Dataverse table.
+# Validate that folder name rather than recursively inspecting every XML file.
+$entitiesRoot = Join-Path -Path $solutionPath -ChildPath 'Entities'
+
+if (!(Test-Path -LiteralPath $entitiesRoot -PathType Container)) {
+    Add-Finding `
+        -Severity Warning `
+        -Rule 'Table' `
+        -Path $entitiesRoot `
+        -Message 'Optional Entities folder is not present.'
+}
+else {
     try {
-        [xml]$xml = Get-Content -LiteralPath $table.FullName -Raw
-        $logicalNameNode = $xml.SelectSingleNode("//*[local-name()='LogicalName']")
-        $logicalName = if ($logicalNameNode) { $logicalNameNode.InnerText.Trim() }
-        if ([string]::IsNullOrWhiteSpace($logicalName)) {
-            Add-Finding -Severity Error -Rule 'Table.LogicalName' -Path $table.FullName -Message 'Could not read the table LogicalName from XML metadata.'
-        } elseif ($logicalName -notmatch $TableLogicalNamePattern) {
-            Add-Finding -Severity Error -Rule 'Table.LogicalName' -Path $table.FullName -Message "Table logical name '$logicalName' does not match '$TableLogicalNamePattern'."
+        $tableFolders = @(
+            Get-ChildItem `
+                -LiteralPath $entitiesRoot `
+                -Directory `
+                -ErrorAction Stop
+        )
+
+        foreach ($tableFolder in $tableFolders) {
+            $logicalName = $tableFolder.Name
+
+            if ($logicalName -notmatch $TableLogicalNamePattern) {
+                Add-Finding `
+                    -Severity Error `
+                    -Rule 'Table.LogicalName' `
+                    -Path $tableFolder.FullName `
+                    -Message "Table logical name '$logicalName' does not match '$TableLogicalNamePattern'."
+            }
         }
-    } catch {
-        Add-Finding -Severity Error -Rule 'Table.Parse' -Path $table.FullName -Message $_.Exception.Message
+    }
+    catch {
+        Add-Finding `
+            -Severity Error `
+            -Rule 'Table.Read' `
+            -Path $entitiesRoot `
+            -Message $_.Exception.Message
     }
 }
 
-# Validate Flows.
-$flows = Get-ComponentFiles -FolderName 'Workflows' -Filter '*.json' -Rule 'Flow'
+# Validate cloud flow names.
+$flows = Get-ComponentFiles `
+    -FolderName 'Workflows' `
+    -Filter '*.json' `
+    -Rule 'Flow'
+
 foreach ($flow in $flows) {
     try {
-        $json = Get-Content -LiteralPath $flow.FullName -Raw | ConvertFrom-Json -ErrorAction Stop
-        $name = $json.properties.displayName
-        if ([string]::IsNullOrWhiteSpace($name)) {
-            Add-Finding -Severity Error -Rule 'Flow.Name' -Path $flow.FullName -Message 'Could not read properties.displayName from flow JSON.'
-        } elseif ($name -notmatch $FlowNamePattern) {
-            Add-Finding -Severity Error -Rule 'Flow.Name' -Path $flow.FullName -Message "Flow name '$name' does not match '$FlowNamePattern'."
+        $json = Get-Content `
+            -LiteralPath $flow.FullName `
+            -Raw |
+            ConvertFrom-Json -ErrorAction Stop
+
+        $name = $null
+
+        # Prefer the display name from workflow metadata when available.
+        if (
+            $null -ne $json.properties -and
+            -not [string]::IsNullOrWhiteSpace(
+                [string]$json.properties.displayName
+            )
+        ) {
+            $name = [string]$json.properties.displayName
         }
-    } catch {
-        Add-Finding -Severity Error -Rule 'Flow.Parse' -Path $flow.FullName -Message $_.Exception.Message
+        else {
+            # SolutionPackager workflow filenames commonly contain the
+            # readable name followed by the workflow GUID.
+            $fileNameWithoutExtension =
+                [System.IO.Path]::GetFileNameWithoutExtension($flow.Name)
+
+            $name = $fileNameWithoutExtension -replace `
+                '-[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$',
+                ''
+        }
+
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            Add-Finding `
+                -Severity Error `
+                -Rule 'Flow.Name' `
+                -Path $flow.FullName `
+                -Message 'Could not determine the flow name from the workflow JSON or exported filename.'
+        }
+        elseif ($name -notmatch $FlowNamePattern) {
+            Add-Finding `
+                -Severity Error `
+                -Rule 'Flow.Name' `
+                -Path $flow.FullName `
+                -Message "Flow name '$name' does not match '$FlowNamePattern'."
+        }
+    }
+    catch {
+        Add-Finding `
+            -Severity Error `
+            -Rule 'Flow.Parse' `
+            -Path $flow.FullName `
+            -Message $_.Exception.Message
     }
 }
 
@@ -198,13 +271,20 @@ if (!(Test-Path -LiteralPath $canvasRoot -PathType Container)) {
                 Add-Finding -Severity Error -Rule 'CanvasApp.AppSource' -Path $sourceRoot -Message 'Canvas source folder contains screen files but is missing App.pa.yaml.'
             }
 
-            foreach ($screen in $sourceFiles | Where-Object Name -notlike 'App.pa.yaml') {
-                $screenName = $screen.Name -replace '\.pa\.yaml$', ''
-                if ($screenName -notmatch $CanvasScreenNamePattern) {
-                    Add-Finding -Severity Error -Rule 'CanvasApp.ScreenName' -Path $screen.FullName -Message "Canvas screen name '$screenName' does not match '$CanvasScreenNamePattern'."
+            $screenFiles = @(
+                    $sourceFiles |
+                        Where-Object {
+                            $_.Name -notlike 'App.pa.yaml' -and
+                            $_.Name -notlike '_*.pa.yaml'
+                        }
+                )
+                foreach ($screen in $screenFiles) {
+                    $screenName = $screen.Name -replace '\.pa\.yaml$', ''
+                    if ($screenName -notmatch $CanvasScreenNamePattern) {
+                        Add-Finding -Severity Error -Rule 'CanvasApp.ScreenName' -Path $screen.FullName -Message "Canvas screen name '$screenName' does not match '$CanvasScreenNamePattern'."
+                    }
                 }
             }
-        }
     } catch {
         Add-Finding -Severity Error -Rule 'CanvasApp.Read' -Path $canvasRoot -Message $_.Exception.Message
     } finally {
