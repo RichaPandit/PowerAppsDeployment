@@ -13,6 +13,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$pacCommand = Get-Command pac -CommandType Application -ErrorAction Stop | Select-Object -First 1
 
 function Invoke-Pac {
     param(
@@ -23,7 +24,8 @@ function Invoke-Pac {
         [string]$Operation
     )
 
-    & pac @Arguments
+    & $pacCommand.Source @Arguments
+
     if ($LASTEXITCODE -ne 0) {
         throw "PAC $Operation failed with exit code $LASTEXITCODE."
     }
@@ -36,13 +38,19 @@ if (!(Test-Path -LiteralPath $exportDirectory)) {
     New-Item -ItemType Directory -Path $exportDirectory -Force | Out-Null
 }
 
-Write-Host "Checking Power Platform CLI..."
-Invoke-Pac -Arguments @("--version") -Operation "version check"
+Write-Host "Using Power Platform CLI at '$($pacCommand.Source)'."
+Write-Host "Exporting '$SolutionName' from '$EnvironmentUrl'..."
 
-Write-Host "Authenticating to Power Platform environment..."
-Invoke-Pac -Arguments @("auth", "create", "--url", $EnvironmentUrl, "--name", "DevEnv") -Operation "authentication"
+Invoke-Pac -Arguments @(
+    "solution",
+    "export",
+    "--name",
+    $SolutionName,
+    "--path",
+    $resolvedExportPath,
+    "--managed",
+    "false",
+    "--overwrite"
+) -Operation "solution export"
 
-Write-Host "Exporting $SolutionName from the specified environment..."
-Invoke-Pac -Arguments @("solution", "export", "--name", $SolutionName, "--path", $resolvedExportPath, "--managed", "false", "--overwrite") -Operation "solution export"
-
-Write-Host "Export completed successfully!"
+Write-Host "Export completed successfully."
