@@ -317,3 +317,4 @@ if ($errorCount -gt 0) {
 }
 
 Write-Host 'All configured validations passed.'
+exit 0
