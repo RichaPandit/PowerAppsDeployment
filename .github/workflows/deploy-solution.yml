@@ -22,10 +22,29 @@ jobs:
       # Step 2: Validate pipeline configuration
       - name: Validate solution configuration
         shell: pwsh
+        env:
+          PP_ENV_URL: ${{ secrets.PP_ENV_URL }}
+          PP_ENV_TARGET_URL: ${{ secrets.PP_ENV_TARGET_URL }}
+          PP_APP_ID: ${{ secrets.PP_APP_ID }}
+          PP_CLIENT_SECRET: ${{ secrets.PP_CLIENT_SECRET }}
+          PP_TENANT_ID: ${{ secrets.PP_TENANT_ID }}
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:PP_SOLUTION_NAME)) {
-            throw "Repository variable PP_SOLUTION_NAME must be set to the solution unique name."
+          $requiredConfiguration = @{
+            "PP_SOLUTION_NAME"   = $env:PP_SOLUTION_NAME
+            "PP_ENV_URL"         = $env:PP_ENV_URL
+            "PP_ENV_TARGET_URL"  = $env:PP_ENV_TARGET_URL
+            "PP_APP_ID"          = $env:PP_APP_ID
+            "PP_CLIENT_SECRET"   = $env:PP_CLIENT_SECRET
+            "PP_TENANT_ID"       = $env:PP_TENANT_ID
           }
+
+          foreach ($item in $requiredConfiguration.GetEnumerator()) {
+            if ([string]::IsNullOrWhiteSpace($item.Value)) {
+              throw "Required pipeline configuration '$($item.Key)' has not been set."
+            }
+          }
+
+          Write-Host "Required pipeline configuration is present."
 
       # Step 3: Install Power Platform CLI
       - name: Install Power Platform CLI
